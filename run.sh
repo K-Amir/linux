@@ -87,6 +87,33 @@ vm.min_free_kbytes = 131072
 vm.dirty_ratio = 40
 vm.dirty_background_ratio = 10
 vm.dirty_expire_centisecs = 3000
+
+# Additional TCP optimizations
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_max_tw_buckets = 2000000
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_max_syn_backlog = 8192
+net.ipv4.tcp_notsent_lowat = 16384
+net.ipv4.tcp_moderate_rcvbuf = 1
+net.ipv4.tcp_mem = 786432 1048576 1572864
+
+# IPv6 optimizations
+net.ipv6.conf.all.disable_ipv6 = 0
+net.ipv6.conf.default.disable_ipv6 = 0
+net.ipv6.conf.all.forwarding = 1
+net.ipv6.conf.default.forwarding = 1
+net.ipv6.conf.all.accept_ra = 2
+net.ipv6.conf.default.accept_ra = 2
+
+# Network queue and buffer optimizations
+net.core.dev_weight = 64
+net.core.netdev_budget = 300
+net.core.netdev_budget_usecs = 8000
+
+# Additional memory optimizations
+vm.max_map_count = 262144
+vm.overcommit_memory = 1
+vm.page-cluster = 3
 EOF
 
 # Apply sysctl settings
@@ -170,6 +197,31 @@ if [ -f /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus ]; then
     echo 4096 > /proc/sys/net/core/rps_sock_flow_entries 2>/dev/null || echo "Warning: Could not set flow entries"
     echo 4096 > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_flow_cnt 2>/dev/null || echo "Warning: Could not set flow count"
 fi
+
+#-----------------------------------------------
+# 10. CPU Frequency Scaling Optimization
+#-----------------------------------------------
+if [ -d "/sys/devices/system/cpu/cpu0/cpufreq" ]; then
+    # Set CPU governor to performance
+    for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+        echo "performance" > "$cpu" 2>/dev/null || true
+    done
+fi
+
+#-----------------------------------------------
+# 11. Additional Network Interface Optimizations
+#-----------------------------------------------
+# Disable network interface power saving
+ethtool -s ${DEFAULT_NIC} wol d 2>/dev/null || true
+ethtool --set-eee ${DEFAULT_NIC} eee off 2>/dev/null || true
+
+# Increase network interface transmit queue length
+ip link set dev ${DEFAULT_NIC} txqueuelen 10000 2>/dev/null || true
+
+# Disable TCP slow start after idle
+ethtool -K ${DEFAULT_NIC} sg on 2>/dev/null || true
+ethtool -K ${DEFAULT_NIC} tso on 2>/dev/null || true
+ethtool -K ${DEFAULT_NIC} ufo on 2>/dev/null || true
 
 echo -e "${GREEN}Complete optimization finished!${NC}"
 echo -e "${GREEN}Please reboot your system to apply all changes.${NC}"
