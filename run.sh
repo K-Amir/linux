@@ -1,17 +1,17 @@
 #!/bin/bash
 
 #----------------------------------------------------
-#  OPTIMIZATION SCRIPT FOR XRAY VLESS+REALITY
-#  - Optimized for high throughput with BBR
-#  - Enhanced TCP performance settings
-#  - Balanced memory management
-#  - Network queue optimization
+#  COMPLETE OPTIMIZATION SCRIPT FOR XRAY VLESS+REALITY
+#  - Enhanced connection stability
+#  - Full system optimization
+#  - IRQ and CPU optimizations
+#  - Memory management
 #----------------------------------------------------
 
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-echo -e "${GREEN}Starting Xray server optimization...${NC}"
+echo -e "${GREEN}Starting complete Xray optimization...${NC}"
 
 #-----------------------------------------------
 # 1. Detect default network interface
@@ -27,18 +27,18 @@ fi
 #-----------------------------------------------
 DEBIAN_FRONTEND=noninteractive apt-get update -y
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    curl wget unzip ethtool haveged
+    curl wget unzip ethtool haveged irqbalance
 
 #-----------------------------------------------
-# 3. Enhanced sysctl configurations for Xray
+# 3. Enhanced sysctl configurations
 #-----------------------------------------------
-cat > /etc/sysctl.d/99-xray-custom.conf << EOF
+cat > /etc/sysctl.d/99-xray-complete.conf << EOF
 # System limits
 fs.file-max = 1000000
 fs.inotify.max_user_instances = 8192
 fs.inotify.max_user_watches = 524288
 
-# TCP optimization for high throughput
+# TCP optimization for stability and performance
 net.core.somaxconn = 32768
 net.core.netdev_max_backlog = 32768
 net.core.rmem_default = 1048576
@@ -51,26 +51,30 @@ net.ipv4.tcp_wmem = 4096 1048576 16777216
 net.ipv4.udp_rmem_min = 8192
 net.ipv4.udp_wmem_min = 8192
 
-# TCP fast recovery and congestion control
+# Enhanced TCP stability settings
 net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_syn_retries = 2
-net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_syn_retries = 3
+net.ipv4.tcp_synack_retries = 3
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_sack = 1
 net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_mtu_probing = 1
 net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_retries1 = 5
+net.ipv4.tcp_retries2 = 15
 net.ipv4.ip_local_port_range = 1024 65535
 
-# TCP keepalive for better connection management
-net.ipv4.tcp_keepalive_time = 300
-net.ipv4.tcp_keepalive_intvl = 30
-net.ipv4.tcp_keepalive_probes = 5
+# Aggressive TCP keepalive for connection persistence
+net.ipv4.tcp_keepalive_time = 60
+net.ipv4.tcp_keepalive_intvl = 10
+net.ipv4.tcp_keepalive_probes = 6
 
-# Connection tracking
+# Extended connection tracking
 net.netfilter.nf_conntrack_max = 262144
 net.netfilter.nf_conntrack_tcp_timeout_established = 7440
 net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 60
 
 # BBR congestion control
 net.core.default_qdisc = fq
@@ -86,12 +90,14 @@ vm.dirty_expire_centisecs = 3000
 EOF
 
 # Apply sysctl settings
-sysctl -p /etc/sysctl.d/99-xray-custom.conf
+sysctl -p /etc/sysctl.d/99-xray-complete.conf
 
 #-----------------------------------------------
 # 4. Network interface optimization
 #-----------------------------------------------
+# Enable offloading features
 ethtool -K "${DEFAULT_NIC}" tso on gso on gro on 2>/dev/null || true
+# Set ring buffer sizes
 ethtool -G "${DEFAULT_NIC}" rx 4096 tx 4096 2>/dev/null || true
 
 #-----------------------------------------------
@@ -131,12 +137,22 @@ EOF
 chmod +x /etc/cron.hourly/memory-management
 
 #-----------------------------------------------
-# 8. Load BBR if not already loaded
+# 8. Load and persist BBR
 #-----------------------------------------------
 if ! lsmod | grep -q bbr; then
     modprobe tcp_bbr
     echo "tcp_bbr" >> /etc/modules-load.d/modules.conf
 fi
 
-echo -e "${GREEN}Xray optimization complete!${NC}"
+#-----------------------------------------------
+# 9. Network scheduler optimization
+#-----------------------------------------------
+if [ -f /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus ]; then
+    echo 'ff' > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus
+    echo 'ff' > /sys/class/net/${DEFAULT_NIC}/queues/tx-0/xps_cpus
+    echo 32768 > /proc/sys/net/core/rps_sock_flow_entries
+    echo 32768 > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_flow_cnt
+fi
+
+echo -e "${GREEN}Complete optimization finished!${NC}"
 echo -e "${GREEN}Please reboot your system to apply all changes.${NC}"
