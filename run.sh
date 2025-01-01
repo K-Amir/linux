@@ -34,22 +34,22 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 #-----------------------------------------------
 cat > /etc/sysctl.d/99-xray-complete.conf << EOF
 # System limits
-fs.file-max = 1000000
-fs.inotify.max_user_instances = 8192
-fs.inotify.max_user_watches = 524288
+fs.file-max = 65535
+fs.inotify.max_user_instances = 4096
+fs.inotify.max_user_watches = 262144
 
 # TCP optimization for stability and performance
-net.core.somaxconn = 32768
-net.core.netdev_max_backlog = 32768
-net.core.rmem_default = 1048576
-net.core.wmem_default = 1048576
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.core.optmem_max = 65536
-net.ipv4.tcp_rmem = 4096 1048576 16777216
-net.ipv4.tcp_wmem = 4096 1048576 16777216
-net.ipv4.udp_rmem_min = 8192
-net.ipv4.udp_wmem_min = 8192
+net.core.somaxconn = 8192
+net.core.netdev_max_backlog = 8192
+net.core.rmem_default = 262144
+net.core.wmem_default = 262144
+net.core.rmem_max = 4194304
+net.core.wmem_max = 4194304
+net.core.optmem_max = 32768
+net.ipv4.tcp_rmem = 4096 262144 4194304
+net.ipv4.tcp_wmem = 4096 262144 4194304
+net.ipv4.udp_rmem_min = 4096
+net.ipv4.udp_wmem_min = 4096
 
 # Enhanced TCP stability settings
 net.ipv4.tcp_fastopen = 3
@@ -70,8 +70,8 @@ net.ipv4.tcp_keepalive_intvl = 10
 net.ipv4.tcp_keepalive_probes = 6
 
 # Extended connection tracking
-net.netfilter.nf_conntrack_max = 262144
-net.netfilter.nf_conntrack_tcp_timeout_established = 7440
+net.netfilter.nf_conntrack_max = 131072
+net.netfilter.nf_conntrack_tcp_timeout_established = 3600
 net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 60
@@ -97,12 +97,12 @@ net.ipv4.tcp_challenge_ack_limit = 1000
 net.ipv4.tcp_limit_output_bytes = 262144
 
 # Memory optimization
-vm.swappiness = 10
-vm.vfs_cache_pressure = 50
-vm.min_free_kbytes = 131072
-vm.dirty_ratio = 40
-vm.dirty_background_ratio = 10
-vm.dirty_expire_centisecs = 3000
+vm.swappiness = 30
+vm.vfs_cache_pressure = 70
+vm.min_free_kbytes = 65536
+vm.dirty_ratio = 20
+vm.dirty_background_ratio = 5
+vm.dirty_expire_centisecs = 1500
 
 # Additional TCP optimizations
 net.ipv4.tcp_fin_timeout = 15
@@ -143,14 +143,14 @@ net.ipv6.ip6frag_low_thresh = 196608
 net.ipv6.ip6frag_high_thresh = 262144
 
 # Network queue and buffer optimizations
-net.core.dev_weight = 64
-net.core.netdev_budget = 300
-net.core.netdev_budget_usecs = 8000
+net.core.dev_weight = 32
+net.core.netdev_budget = 200
+net.core.netdev_budget_usecs = 4000
 
 # Additional memory optimizations
-vm.max_map_count = 262144
+vm.max_map_count = 131072
 vm.overcommit_memory = 1
-vm.page-cluster = 3
+vm.page-cluster = 2
 EOF
 
 # Apply sysctl settings
@@ -215,24 +215,20 @@ if [ -f /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus ]; then
     # Get number of CPU cores
     NUM_CORES=$(nproc)
     
-    # Calculate appropriate CPU mask based on cores
-    if [ "$NUM_CORES" -le 4 ]; then
-        # For 4 or fewer cores, use all
-        CPU_MASK="f"
-    elif [ "$NUM_CORES" -le 8 ]; then
-        CPU_MASK="ff"
+    # For 1-2 cores, use a more conservative mask
+    if [ "$NUM_CORES" -eq 1 ]; then
+        CPU_MASK="1"
     else
-        # For more cores, limit to first 8 cores
-        CPU_MASK="ff"
+        CPU_MASK="3"  # Use both cores for 2-core system
     fi
     
     # Apply RPS/XPS settings safely
     echo "$CPU_MASK" > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus 2>/dev/null || echo "Warning: Could not set RPS CPU mask"
     echo "$CPU_MASK" > /sys/class/net/${DEFAULT_NIC}/queues/tx-0/xps_cpus 2>/dev/null || echo "Warning: Could not set XPS CPU mask"
     
-    # Set flow entries (using smaller, safer values)
-    echo 4096 > /proc/sys/net/core/rps_sock_flow_entries 2>/dev/null || echo "Warning: Could not set flow entries"
-    echo 4096 > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_flow_cnt 2>/dev/null || echo "Warning: Could not set flow count"
+    # Set flow entries (using smaller values for low memory)
+    echo 2048 > /proc/sys/net/core/rps_sock_flow_entries 2>/dev/null || echo "Warning: Could not set flow entries"
+    echo 2048 > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_flow_cnt 2>/dev/null || echo "Warning: Could not set flow count"
 fi
 
 #-----------------------------------------------
