@@ -80,6 +80,22 @@ net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 60
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
+# Additional latency optimizations
+net.ipv4.tcp_low_latency = 1
+net.ipv4.tcp_frto = 0
+net.ipv4.tcp_no_metrics_save = 1
+net.ipv4.tcp_rfc1337 = 1
+net.ipv4.tcp_adv_win_scale = 2
+net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.route.flush = 1
+net.ipv4.udp_early_demux = 1
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.conf.default.rp_filter = 0
+net.core.busy_poll = 50
+net.core.busy_read = 50
+net.ipv4.tcp_challenge_ack_limit = 1000
+net.ipv4.tcp_limit_output_bytes = 262144
+
 # Memory optimization
 vm.swappiness = 10
 vm.vfs_cache_pressure = 50
@@ -104,6 +120,27 @@ net.ipv6.conf.all.forwarding = 1
 net.ipv6.conf.default.forwarding = 1
 net.ipv6.conf.all.accept_ra = 2
 net.ipv6.conf.default.accept_ra = 2
+
+# Additional IPv6 latency optimizations
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv6.conf.default.accept_redirects = 0
+net.ipv6.conf.all.autoconf = 0
+net.ipv6.conf.default.autoconf = 0
+net.ipv6.conf.all.router_solicitations = 0
+net.ipv6.conf.default.router_solicitations = 0
+net.ipv6.conf.all.use_tempaddr = 0
+net.ipv6.conf.default.use_tempaddr = 0
+net.ipv6.route.max_size = 32768
+net.ipv6.neigh.default.gc_thresh1 = 1024
+net.ipv6.neigh.default.gc_thresh2 = 2048
+net.ipv6.neigh.default.gc_thresh3 = 4096
+net.ipv6.neigh.default.gc_interval = 30
+net.ipv6.neigh.default.gc_stale_time = 60
+net.ipv6.bindv6only = 0
+net.ipv6.mld_max_msf = 64
+net.ipv6.ip6frag_time = 60
+net.ipv6.ip6frag_low_thresh = 196608
+net.ipv6.ip6frag_high_thresh = 262144
 
 # Network queue and buffer optimizations
 net.core.dev_weight = 64
@@ -222,6 +259,18 @@ ip link set dev ${DEFAULT_NIC} txqueuelen 10000 2>/dev/null || true
 ethtool -K ${DEFAULT_NIC} sg on 2>/dev/null || true
 ethtool -K ${DEFAULT_NIC} tso on 2>/dev/null || true
 ethtool -K ${DEFAULT_NIC} ufo on 2>/dev/null || true
+
+# Additional latency optimizations for network interface
+# Disable interrupt coalescing
+ethtool -C ${DEFAULT_NIC} rx-usecs 0 rx-frames 0 2>/dev/null || true
+# Disable adaptive interrupt coalescing
+ethtool -C ${DEFAULT_NIC} adaptive-rx off 2>/dev/null || true
+# Set interrupt coalescing parameters for low latency
+ethtool -C ${DEFAULT_NIC} rx-usecs 0 tx-usecs 0 2>/dev/null || true
+
+# Optimize for low latency using tc
+tc qdisc add dev ${DEFAULT_NIC} root fq_codel flows 32768 quantum 300 noecn 2>/dev/null || \
+tc qdisc change dev ${DEFAULT_NIC} root fq_codel flows 32768 quantum 300 noecn 2>/dev/null || true
 
 echo -e "${GREEN}Complete optimization finished!${NC}"
 echo -e "${GREEN}Please reboot your system to apply all changes.${NC}"
