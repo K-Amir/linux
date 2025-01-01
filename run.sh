@@ -34,9 +34,9 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 #-----------------------------------------------
 cat > /etc/sysctl.d/99-xray-complete.conf << EOF
 # System limits
-fs.file-max = 1000000
-fs.inotify.max_user_instances = 8192
-fs.inotify.max_user_watches = 524288
+fs.file-max = 65535
+fs.inotify.max_user_instances = 4096
+fs.inotify.max_user_watches = 262144
 
 # TCP optimization for stability and performance
 net.core.somaxconn = 32768
@@ -48,35 +48,35 @@ net.core.wmem_max = 16777216
 net.core.optmem_max = 65536
 net.ipv4.tcp_rmem = 4096 1048576 16777216
 net.ipv4.tcp_wmem = 4096 1048576 16777216
-net.ipv4.udp_rmem_min = 8192
-net.ipv4.udp_wmem_min = 8192
+net.ipv4.udp_rmem_min = 4096
+net.ipv4.udp_wmem_min = 4096
 
 # Enhanced TCP stability settings
 net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_syn_retries = 3
-net.ipv4.tcp_synack_retries = 3
+net.ipv4.tcp_syn_retries = 2
+net.ipv4.tcp_synack_retries = 2
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_sack = 1
 net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_mtu_probing = 1
 net.ipv4.tcp_slow_start_after_idle = 0
-net.ipv4.tcp_retries1 = 5
-net.ipv4.tcp_retries2 = 15
+net.ipv4.tcp_retries1 = 3
+net.ipv4.tcp_retries2 = 5
 net.ipv4.ip_local_port_range = 1024 65535
 
 # Aggressive TCP keepalive for connection persistence
-net.ipv4.tcp_keepalive_time = 60
-net.ipv4.tcp_keepalive_intvl = 10
-net.ipv4.tcp_keepalive_probes = 6
+net.ipv4.tcp_keepalive_time = 30
+net.ipv4.tcp_keepalive_intvl = 5
+net.ipv4.tcp_keepalive_probes = 3
 
 # Extended connection tracking
-net.netfilter.nf_conntrack_max = 262144
-net.netfilter.nf_conntrack_tcp_timeout_established = 7440
+net.netfilter.nf_conntrack_max = 131072
+net.netfilter.nf_conntrack_tcp_timeout_established = 3600
 net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 60
 
-# BBR congestion control
+# BBR congestion control with enhanced parameters
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
@@ -96,22 +96,23 @@ net.core.busy_read = 50
 net.ipv4.tcp_challenge_ack_limit = 1000
 net.ipv4.tcp_limit_output_bytes = 262144
 
-# Memory optimization
+# Memory optimization for better performance
 vm.swappiness = 10
-vm.vfs_cache_pressure = 50
+vm.vfs_cache_pressure = 70
 vm.min_free_kbytes = 131072
 vm.dirty_ratio = 40
 vm.dirty_background_ratio = 10
 vm.dirty_expire_centisecs = 3000
+vm.dirty_writeback_centisecs = 500
 
 # Additional TCP optimizations
-net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_fin_timeout = 10
 net.ipv4.tcp_max_tw_buckets = 2000000
 net.ipv4.tcp_tw_reuse = 1
-net.ipv4.tcp_max_syn_backlog = 8192
-net.ipv4.tcp_notsent_lowat = 16384
+net.ipv4.tcp_max_syn_backlog = 32768
+net.ipv4.tcp_notsent_lowat = 131072
 net.ipv4.tcp_moderate_rcvbuf = 1
-net.ipv4.tcp_mem = 786432 1048576 1572864
+net.ipv4.tcp_mem = 786432 1048576 26777216
 
 # IPv6 optimizations
 net.ipv6.conf.all.disable_ipv6 = 0
@@ -143,14 +144,14 @@ net.ipv6.ip6frag_low_thresh = 196608
 net.ipv6.ip6frag_high_thresh = 262144
 
 # Network queue and buffer optimizations
-net.core.dev_weight = 64
-net.core.netdev_budget = 300
-net.core.netdev_budget_usecs = 8000
+net.core.dev_weight = 32
+net.core.netdev_budget = 200
+net.core.netdev_budget_usecs = 4000
 
 # Additional memory optimizations
-vm.max_map_count = 262144
+vm.max_map_count = 131072
 vm.overcommit_memory = 1
-vm.page-cluster = 3
+vm.page-cluster = 2
 EOF
 
 # Apply sysctl settings
@@ -159,10 +160,21 @@ sysctl -p /etc/sysctl.d/99-xray-complete.conf
 #-----------------------------------------------
 # 4. Network interface optimization
 #-----------------------------------------------
-# Enable offloading features
-ethtool -K "${DEFAULT_NIC}" tso on gso on gro on 2>/dev/null || true
-# Set ring buffer sizes
-ethtool -G "${DEFAULT_NIC}" rx 4096 tx 4096 2>/dev/null || true
+# Enable optimized network offloading
+ethtool -K ${DEFAULT_NIC} tso on gso on gro on sg on tx on rx on 2>/dev/null || true
+
+# Optimize ring buffer sizes for better performance
+ethtool -G ${DEFAULT_NIC} rx 4096 tx 4096 2>/dev/null || true
+
+# Set interrupt coalescence for better stability
+ethtool -C ${DEFAULT_NIC} adaptive-rx on adaptive-tx on rx-usecs 100 tx-usecs 100 2>/dev/null || true
+
+# Increase queue length for better performance
+ip link set dev ${DEFAULT_NIC} txqueuelen 20000 2>/dev/null || true
+
+# Use fq_codel with optimized parameters for better throughput and lower latency
+tc qdisc add dev ${DEFAULT_NIC} root fq_codel flows 32768 quantum 1514 target 5ms interval 100ms noecn 2>/dev/null || \
+tc qdisc change dev ${DEFAULT_NIC} root fq_codel flows 32768 quantum 1514 target 5ms interval 100ms noecn 2>/dev/null || true
 
 #-----------------------------------------------
 # 5. System limits for Xray
@@ -215,24 +227,20 @@ if [ -f /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus ]; then
     # Get number of CPU cores
     NUM_CORES=$(nproc)
     
-    # Calculate appropriate CPU mask based on cores
-    if [ "$NUM_CORES" -le 4 ]; then
-        # For 4 or fewer cores, use all
-        CPU_MASK="f"
-    elif [ "$NUM_CORES" -le 8 ]; then
-        CPU_MASK="ff"
+    # For 1-2 cores, use a more conservative mask
+    if [ "$NUM_CORES" -eq 1 ]; then
+        CPU_MASK="1"
     else
-        # For more cores, limit to first 8 cores
-        CPU_MASK="ff"
+        CPU_MASK="3"  # Use both cores for 2-core system
     fi
     
     # Apply RPS/XPS settings safely
     echo "$CPU_MASK" > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus 2>/dev/null || echo "Warning: Could not set RPS CPU mask"
     echo "$CPU_MASK" > /sys/class/net/${DEFAULT_NIC}/queues/tx-0/xps_cpus 2>/dev/null || echo "Warning: Could not set XPS CPU mask"
     
-    # Set flow entries (using smaller, safer values)
-    echo 4096 > /proc/sys/net/core/rps_sock_flow_entries 2>/dev/null || echo "Warning: Could not set flow entries"
-    echo 4096 > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_flow_cnt 2>/dev/null || echo "Warning: Could not set flow count"
+    # Set flow entries (using smaller values for low memory)
+    echo 2048 > /proc/sys/net/core/rps_sock_flow_entries 2>/dev/null || echo "Warning: Could not set flow entries"
+    echo 2048 > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_flow_cnt 2>/dev/null || echo "Warning: Could not set flow count"
 fi
 
 #-----------------------------------------------
@@ -252,9 +260,6 @@ fi
 ethtool -s ${DEFAULT_NIC} wol d 2>/dev/null || true
 ethtool --set-eee ${DEFAULT_NIC} eee off 2>/dev/null || true
 
-# Increase network interface transmit queue length
-ip link set dev ${DEFAULT_NIC} txqueuelen 10000 2>/dev/null || true
-
 # Disable TCP slow start after idle
 ethtool -K ${DEFAULT_NIC} sg on 2>/dev/null || true
 ethtool -K ${DEFAULT_NIC} tso on 2>/dev/null || true
@@ -267,10 +272,6 @@ ethtool -C ${DEFAULT_NIC} rx-usecs 0 rx-frames 0 2>/dev/null || true
 ethtool -C ${DEFAULT_NIC} adaptive-rx off 2>/dev/null || true
 # Set interrupt coalescing parameters for low latency
 ethtool -C ${DEFAULT_NIC} rx-usecs 0 tx-usecs 0 2>/dev/null || true
-
-# Optimize for low latency using tc
-tc qdisc add dev ${DEFAULT_NIC} root fq_codel flows 32768 quantum 300 noecn 2>/dev/null || \
-tc qdisc change dev ${DEFAULT_NIC} root fq_codel flows 32768 quantum 300 noecn 2>/dev/null || true
 
 echo -e "${GREEN}Complete optimization finished!${NC}"
 echo -e "${GREEN}Please reboot your system to apply all changes.${NC}"
