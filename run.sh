@@ -145,13 +145,30 @@ if ! lsmod | grep -q bbr; then
 fi
 
 #-----------------------------------------------
-# 9. Network scheduler optimization
+# 9. Network scheduler optimization (Fixed)
 #-----------------------------------------------
 if [ -f /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus ]; then
-    echo 'ff' > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus
-    echo 'ff' > /sys/class/net/${DEFAULT_NIC}/queues/tx-0/xps_cpus
-    echo 32768 > /proc/sys/net/core/rps_sock_flow_entries
-    echo 32768 > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_flow_cnt
+    # Get number of CPU cores
+    NUM_CORES=$(nproc)
+    
+    # Calculate appropriate CPU mask based on cores
+    if [ "$NUM_CORES" -le 4 ]; then
+        # For 4 or fewer cores, use all
+        CPU_MASK="f"
+    elif [ "$NUM_CORES" -le 8 ]; then
+        CPU_MASK="ff"
+    else
+        # For more cores, limit to first 8 cores
+        CPU_MASK="ff"
+    fi
+    
+    # Apply RPS/XPS settings safely
+    echo "$CPU_MASK" > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_cpus 2>/dev/null || echo "Warning: Could not set RPS CPU mask"
+    echo "$CPU_MASK" > /sys/class/net/${DEFAULT_NIC}/queues/tx-0/xps_cpus 2>/dev/null || echo "Warning: Could not set XPS CPU mask"
+    
+    # Set flow entries (using smaller, safer values)
+    echo 4096 > /proc/sys/net/core/rps_sock_flow_entries 2>/dev/null || echo "Warning: Could not set flow entries"
+    echo 4096 > /sys/class/net/${DEFAULT_NIC}/queues/rx-0/rps_flow_cnt 2>/dev/null || echo "Warning: Could not set flow count"
 fi
 
 echo -e "${GREEN}Complete optimization finished!${NC}"
