@@ -32,7 +32,7 @@
     #-----------------------------------------------
     # 3. Enhanced sysctl configurations
     #-----------------------------------------------
-    cat > /etc/sysctl.d/99-xray-complete.conf << EOF
+    cat > /etc/sysctl.d/99-xray-complete.conf << 'EOF'
     # System limits
     fs.file-max = 65535
     fs.inotify.max_user_instances = 4096
