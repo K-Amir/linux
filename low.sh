@@ -69,25 +69,25 @@ net.ipv4.ip_local_port_range = 1024 65535
 # Ultra-aggressive gaming keepalive
 net.ipv4.tcp_keepalive_time = 5
 net.ipv4.tcp_keepalive_intvl = 1
-net.ipv4.tcp_keepalive_probes = 3
+net.ipv4.tcp_keepalive_probes = 2
 net.ipv4.tcp_retries1 = 1
 net.ipv4.tcp_retries2 = 2
 
 # Enhanced gaming connection tracking
 net.netfilter.nf_conntrack_max = 262144
 net.netfilter.nf_conntrack_tcp_timeout_established = 600
-net.netfilter.nf_conntrack_tcp_timeout_time_wait = 5
-net.netfilter.nf_conntrack_tcp_timeout_close_wait = 5
-net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 5
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 3
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 3
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 3
 
 # Direct TLS optimization (no WebSocket)
-net.core.busy_poll = 10
-net.core.busy_read = 10
-net.ipv4.tcp_notsent_lowat = 4096
+net.core.busy_poll = 5
+net.core.busy_read = 5
+net.ipv4.tcp_notsent_lowat = 2048
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_mtu_probing = 1
 net.ipv4.tcp_base_mss = 1024
-net.ipv4.tcp_probe_interval = 0.1
+net.ipv4.tcp_probe_interval = 0.05
 net.ipv4.tcp_probe_threshold = 1
 net.ipv4.tcp_tso_win_divisor = 1
 
@@ -95,7 +95,7 @@ net.ipv4.tcp_tso_win_divisor = 1
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 net.ipv4.tcp_window_scaling = 1
-net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_timestamps = 0
 net.ipv4.tcp_sack = 1
 net.ipv4.tcp_dsack = 1
 net.ipv4.tcp_fack = 1
@@ -109,33 +109,33 @@ net.ipv4.tcp_low_latency = 1
 net.ipv4.tcp_frto = 0
 net.ipv4.tcp_no_metrics_save = 1
 net.ipv4.tcp_rfc1337 = 1
-net.ipv4.tcp_adv_win_scale = 2
-net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_adv_win_scale = 1
+net.ipv4.tcp_abort_on_overflow = 1
 net.ipv4.route.flush = 1
 net.ipv4.udp_early_demux = 1
 net.ipv4.conf.all.rp_filter = 0
 net.ipv4.conf.default.rp_filter = 0
-net.core.busy_poll = 50
-net.core.busy_read = 50
-net.ipv4.tcp_notsent_lowat = 131072
-net.ipv4.tcp_moderate_rcvbuf = 1
+net.core.busy_poll = 5
+net.core.busy_read = 5
+net.ipv4.tcp_notsent_lowat = 2048
+net.ipv4.tcp_moderate_rcvbuf = 0
 
 # Memory optimization
-vm.swappiness = 10
-vm.vfs_cache_pressure = 50
-vm.min_free_kbytes = 131072
-vm.dirty_ratio = 20
-vm.dirty_background_ratio = 5
-vm.dirty_expire_centisecs = 1500
-vm.dirty_writeback_centisecs = 300
-vm.max_map_count = 131072
+vm.swappiness = 1
+vm.vfs_cache_pressure = 20
+vm.min_free_kbytes = 65536
+vm.dirty_ratio = 5
+vm.dirty_background_ratio = 2
+vm.dirty_expire_centisecs = 500
+vm.dirty_writeback_centisecs = 100
+vm.max_map_count = 262144
 vm.overcommit_memory = 1
-vm.page-cluster = 2
+vm.page-cluster = 0
 
 # Network queue optimization
-net.core.dev_weight = 32
-net.core.netdev_budget = 200
-net.core.netdev_budget_usecs = 4000
+net.core.dev_weight = 64
+net.core.netdev_budget = 600
+net.core.netdev_budget_usecs = 2000
 
 # IPv6 configuration
 net.ipv6.conf.all.disable_ipv6 = 0
@@ -333,6 +333,82 @@ systemctl disable snapd 2>/dev/null || true
 systemctl stop packagekit 2>/dev/null || true
 systemctl disable packagekit 2>/dev/null || true
 
+#-----------------------------------------------
+# 14. Additional Low-Latency Optimizations
+#-----------------------------------------------
+# Disable CPU power saving states
+if [ -d "/sys/devices/system/cpu/intel_pstate" ]; then
+    echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
+    echo "performance" > /sys/devices/system/cpu/intel_pstate/status 2>/dev/null || true
+fi
+
+# Set CPU governor and disable power saving for all cores
+for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+    echo "performance" > "$cpu" 2>/dev/null || true
+done
+
+# Disable CPU power saving features
+for cpu in /sys/devices/system/cpu/cpu*/power/energy_perf_bias; do
+    echo "performance" > "$cpu" 2>/dev/null || true
+done
+
+# Optimize PCIe for network card
+if [ -d "/sys/bus/pci/devices" ]; then
+    for dev in /sys/bus/pci/devices/*; do
+        if [ -f "$dev/power/control" ]; then
+            echo "on" > "$dev/power/control" 2>/dev/null || true
+        fi
+        if [ -f "$dev/power/wakeup" ]; then
+            echo "disabled" > "$dev/power/wakeup" 2>/dev/null || true
+        fi
+    done
+fi
+
+# Optimize network card PCIe settings
+for dev in /sys/bus/pci/devices/*; do
+    if [ -e "$dev/vendor" ] && [ -e "$dev/class" ]; then
+        # Check if it's a network device (0x02 is the network class)
+        class=$(cat "$dev/class" 2>/dev/null)
+        if [[ $class == "0x020000" ]]; then
+            # Max performance for network devices
+            if [ -f "$dev/power/control" ]; then
+                echo "on" > "$dev/power/control" 2>/dev/null || true
+            fi
+            # Set maximum PCIe performance state
+            if [ -f "$dev/power/power_state" ]; then
+                echo "D0" > "$dev/power/power_state" 2>/dev/null || true
+            fi
+        fi
+    fi
+done
+
+# Optimize network interface queues
+for queue in /sys/class/net/${DEFAULT_NIC}/queues/rx-*; do
+    if [ -f "$queue/rps_flow_cnt" ]; then
+        echo 4096 > "$queue/rps_flow_cnt" 2>/dev/null || true
+    fi
+    if [ -f "$queue/rps_cpus" ]; then
+        echo "f" > "$queue/rps_cpus" 2>/dev/null || true
+    fi
+done
+
+for queue in /sys/class/net/${DEFAULT_NIC}/queues/tx-*; do
+    if [ -f "$queue/xps_cpus" ]; then
+        echo "f" > "$queue/xps_cpus" 2>/dev/null || true
+    fi
+done
+
+# Optimize network buffers
+sysctl -w net.core.rmem_max=16777216 2>/dev/null || true
+sysctl -w net.core.wmem_max=16777216 2>/dev/null || true
+sysctl -w net.core.rmem_default=16777216 2>/dev/null || true
+sysctl -w net.core.wmem_default=16777216 2>/dev/null || true
+
+# Disable any power saving features on the network interface
+ethtool -s ${DEFAULT_NIC} speed 1000 duplex full autoneg off 2>/dev/null || true
+ethtool --set-priv-flags ${DEFAULT_NIC} tx-nocache-copy off 2>/dev/null || true
+ethtool --set-priv-flags ${DEFAULT_NIC} rx-nocache-copy off 2>/dev/null || true
+
 echo -e "${GREEN}Ultra-low latency gaming optimization complete!${NC}"
 echo -e "${GREEN}Please reboot your system to apply all changes.${NC}"
 echo -e "${GREEN}Recommendations for lowest latency:${NC}"
@@ -340,3 +416,7 @@ echo -e "1. Use direct TLS without WebSocket for minimal overhead"
 echo -e "2. Choose a server with the lowest ping to your gaming servers"
 echo -e "3. Consider using anycast IP for automatic server selection"
 echo -e "4. Monitor your connection with 'mtr' or 'ping' to verify latency"
+echo -e "5. Disable any RGB software or unnecessary background processes"
+echo -e "6. Consider using CPU isolation (isolcpus boot parameter)"
+echo -e "7. Use a wired connection instead of WiFi"
+echo -e "8. Consider using network interface card with SR-IOV support"
