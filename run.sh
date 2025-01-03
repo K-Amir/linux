@@ -65,9 +65,9 @@ net.ipv4.tcp_retries2 = 5
 net.ipv4.ip_local_port_range = 1024 65535
 
 # Aggressive TCP keepalive for connection persistence
-net.ipv4.tcp_keepalive_time = 30
-net.ipv4.tcp_keepalive_intvl = 5
-net.ipv4.tcp_keepalive_probes = 3
+net.ipv4.tcp_keepalive_time = 15
+net.ipv4.tcp_keepalive_intvl = 3
+net.ipv4.tcp_keepalive_probes = 5
 
 # Extended connection tracking
 net.netfilter.nf_conntrack_max = 131072
@@ -106,8 +106,8 @@ vm.dirty_expire_centisecs = 3000
 vm.dirty_writeback_centisecs = 500
 
 # Additional TCP optimizations
-net.ipv4.tcp_fin_timeout = 10
-net.ipv4.tcp_max_tw_buckets = 2000000
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_max_tw_buckets = 1440000
 net.ipv4.tcp_tw_reuse = 1
 net.ipv4.tcp_max_syn_backlog = 32768
 net.ipv4.tcp_notsent_lowat = 131072
@@ -152,6 +152,33 @@ net.core.netdev_budget_usecs = 4000
 vm.max_map_count = 131072
 vm.overcommit_memory = 1
 vm.page-cluster = 2
+
+# Enhanced mobile connection stability
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_max_tw_buckets = 1440000
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_max_orphans = 65536
+net.ipv4.tcp_orphan_retries = 1
+net.ipv4.tcp_synack_retries = 1
+net.ipv4.tcp_syn_retries = 2
+net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_rfc1337 = 1
+
+# Improved connection recovery for mobile
+net.ipv4.tcp_recovery = 1
+net.ipv4.tcp_thin_dupack = 1
+net.ipv4.tcp_thin_linear_timeouts = 1
+net.ipv4.tcp_early_retrans = 1
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_no_metrics_save = 1
+
+# Mobile-optimized memory settings
+vm.swappiness = 10
+vm.vfs_cache_pressure = 50
+vm.dirty_ratio = 30
+vm.dirty_background_ratio = 5
+vm.dirty_expire_centisecs = 1500
+vm.dirty_writeback_centisecs = 300
 EOF
 
 # Apply sysctl settings
