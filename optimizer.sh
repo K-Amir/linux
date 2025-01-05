@@ -40,18 +40,18 @@ fs.inotify.max_user_instances = 8192
 fs.inotify.max_user_watches = 524288
 
 # TCP optimization for stability and mobile apps
-net.core.somaxconn = 32768
-net.core.netdev_max_backlog = 32768
-net.core.rmem_default = 1048576
-net.core.wmem_default = 1048576
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.core.optmem_max = 65536
-net.ipv4.tcp_rmem = 4096 1048576 8388608
-net.ipv4.tcp_wmem = 4096 1048576 8388608
-net.ipv4.tcp_mem = 786432 1048576 16777216
-net.ipv4.udp_rmem_min = 8192
-net.ipv4.udp_wmem_min = 8192
+net.core.somaxconn = 16384
+net.core.netdev_max_backlog = 16384
+net.core.rmem_default = 524288
+net.core.wmem_default = 524288
+net.core.rmem_max = 8388608
+net.core.wmem_max = 8388608
+net.core.optmem_max = 32768
+net.ipv4.tcp_rmem = 4096 524288 4194304
+net.ipv4.tcp_wmem = 4096 524288 4194304
+net.ipv4.tcp_mem = 393216 524288 8388608
+net.ipv4.udp_rmem_min = 4096
+net.ipv4.udp_wmem_min = 4096
 
 # Enhanced TCP stability and mobile optimization
 net.ipv4.tcp_fastopen = 3
@@ -73,11 +73,11 @@ net.ipv4.tcp_retries1 = 3
 net.ipv4.tcp_retries2 = 5
 
 # Connection tracking optimization
-net.netfilter.nf_conntrack_max = 262144
-net.netfilter.nf_conntrack_tcp_timeout_established = 7200
-net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30
-net.netfilter.nf_conntrack_tcp_timeout_close_wait = 30
-net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 30
+net.netfilter.nf_conntrack_max = 131072
+net.netfilter.nf_conntrack_tcp_timeout_established = 3600
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 15
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 15
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 15
 
 # BBR and advanced TCP features
 net.core.default_qdisc = fq
@@ -109,31 +109,29 @@ net.ipv4.tcp_notsent_lowat = 131072
 net.ipv4.tcp_moderate_rcvbuf = 1
 
 # Memory optimization
-vm.swappiness = 10
-vm.vfs_cache_pressure = 50
-vm.min_free_kbytes = 65536
-vm.dirty_ratio = 20
-vm.dirty_background_ratio = 10
-vm.dirty_expire_centisecs = 6000
-vm.dirty_writeback_centisecs = 500
-vm.max_map_count = 262144
-vm.overcommit_memory = 0
-vm.page-cluster = 3
+vm.swappiness = 30
+vm.vfs_cache_pressure = 70
+vm.min_free_kbytes = 131072
+vm.dirty_ratio = 10
+vm.dirty_background_ratio = 5
+vm.dirty_expire_centisecs = 3000
+vm.dirty_writeback_centisecs = 300
+vm.max_map_count = 131072
+vm.overcommit_memory = 2
+vm.overcommit_ratio = 80
+vm.page-cluster = 2
 
-# XTLS-Vision memory optimizations
-vm.nr_hugepages = 4
-vm.hugetlb_shm_group = 0
-vm.compact_memory = 1
-vm.compact_unevictable_allowed = 1
-vm.oom_kill_allocating_task = 0
-vm.watermark_boost_factor = 30000
-vm.watermark_scale_factor = 2000
-vm.page_lock_unfairness = 1
+# OOM Killer optimization
+vm.oom_kill_allocating_task = 1
+vm.panic_on_oom = 0
+vm.watermark_boost_factor = 15000
+vm.watermark_scale_factor = 1000
+vm.page_lock_unfairness = 5
 
 # Network queue optimization
-net.core.dev_weight = 32
-net.core.netdev_budget = 300
-net.core.netdev_budget_usecs = 4000
+net.core.dev_weight = 16
+net.core.netdev_budget = 150
+net.core.netdev_budget_usecs = 2000
 
 # IPv6 configuration
 net.ipv6.conf.all.disable_ipv6 = 0
@@ -187,6 +185,12 @@ net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_tso_win_divisor = 8
 net.ipv4.tcp_min_tso_segs = 2
 net.ipv4.tcp_base_mss = 1024
+
+# Additional memory protection
+kernel.panic = 10
+kernel.panic_on_oops = 1
+kernel.shmmax = 68719476736
+kernel.shmall = 4294967296
 EOF
 
 # Apply sysctl settings
