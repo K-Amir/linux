@@ -6,6 +6,7 @@
 #  - Full system optimization
 #  - IRQ and CPU optimizations
 #  - Memory management
+#  - TCP and XTLS-Vision optimizations
 #----------------------------------------------------
 
 GREEN='\033[0;32m'
@@ -46,11 +47,11 @@ net.core.wmem_default = 1048576
 net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
 net.core.optmem_max = 65536
-net.ipv4.tcp_rmem = 4096 1048576 16777216
-net.ipv4.tcp_wmem = 4096 1048576 16777216
+net.ipv4.tcp_rmem = 8192 1048576 16777216
+net.ipv4.tcp_wmem = 8192 1048576 16777216
 net.ipv4.tcp_mem = 786432 1048576 26777216
-net.ipv4.udp_rmem_min = 4096
-net.ipv4.udp_wmem_min = 4096
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
 
 # Enhanced TCP stability and mobile optimization
 net.ipv4.tcp_fastopen = 3
@@ -152,6 +153,16 @@ net.ipv6.mld_max_msf = 64
 net.ipv6.ip6frag_time = 60
 net.ipv6.ip6frag_low_thresh = 196608
 net.ipv6.ip6frag_high_thresh = 262144
+
+# XTLS-Vision and Reality specific optimizations
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_limit_output_bytes = 262144
+net.ipv4.tcp_challenge_ack_limit = 1000
+net.ipv4.tcp_max_reordering = 300
+net.ipv4.tcp_workaround_signed_windows = 1
+net.ipv4.tcp_autocorking = 0
+net.ipv4.tcp_no_metrics_save = 1
 EOF
 
 # Apply sysctl settings
@@ -272,6 +283,19 @@ ethtool -C ${DEFAULT_NIC} rx-usecs 0 rx-frames 0 2>/dev/null || true
 ethtool -C ${DEFAULT_NIC} adaptive-rx off 2>/dev/null || true
 # Set interrupt coalescing parameters for low latency
 ethtool -C ${DEFAULT_NIC} rx-usecs 0 tx-usecs 0 2>/dev/null || true
+
+#-----------------------------------------------
+# 12. XTLS-Vision Flow Control Optimizations
+#-----------------------------------------------
+# Optimize TCP buffer sizes for XTLS-Vision
+ip route change default via $(ip route show default | awk '{print $3}') dev ${DEFAULT_NIC} initcwnd 10 initrwnd 10 2>/dev/null || true
+
+# Set optimal TCP queue size for XTLS-Vision
+sysctl -w net.ipv4.tcp_limit_output_bytes=262144 2>/dev/null || true
+
+# Optimize network queuing for XTLS
+tc qdisc add dev ${DEFAULT_NIC} root fq_pie limit 10000 flows 2048 2>/dev/null || \
+tc qdisc change dev ${DEFAULT_NIC} root fq_pie limit 10000 flows 2048 2>/dev/null || true
 
 echo -e "${GREEN}Complete optimization finished!${NC}"
 echo -e "${GREEN}Please reboot your system to apply all changes.${NC}"
