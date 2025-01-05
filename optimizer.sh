@@ -40,18 +40,18 @@ fs.inotify.max_user_instances = 8192
 fs.inotify.max_user_watches = 524288
 
 # TCP optimization for stability and mobile apps
-net.core.somaxconn = 65535
-net.core.netdev_max_backlog = 65535
-net.core.rmem_default = 2097152
-net.core.wmem_default = 2097152
-net.core.rmem_max = 33554432
-net.core.wmem_max = 33554432
-net.core.optmem_max = 131072
-net.ipv4.tcp_rmem = 16384 2097152 33554432
-net.ipv4.tcp_wmem = 16384 2097152 33554432
-net.ipv4.tcp_mem = 786432 2097152 33554432
-net.ipv4.udp_rmem_min = 16384
-net.ipv4.udp_wmem_min = 16384
+net.core.somaxconn = 32768
+net.core.netdev_max_backlog = 32768
+net.core.rmem_default = 1048576
+net.core.wmem_default = 1048576
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.optmem_max = 65536
+net.ipv4.tcp_rmem = 4096 1048576 8388608
+net.ipv4.tcp_wmem = 4096 1048576 8388608
+net.ipv4.tcp_mem = 786432 1048576 16777216
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
 
 # Enhanced TCP stability and mobile optimization
 net.ipv4.tcp_fastopen = 3
@@ -109,15 +109,15 @@ net.ipv4.tcp_notsent_lowat = 131072
 net.ipv4.tcp_moderate_rcvbuf = 1
 
 # Memory optimization
-vm.swappiness = 5
-vm.vfs_cache_pressure = 40
-vm.min_free_kbytes = 262144
-vm.dirty_ratio = 30
-vm.dirty_background_ratio = 5
-vm.dirty_expire_centisecs = 3000
+vm.swappiness = 10
+vm.vfs_cache_pressure = 50
+vm.min_free_kbytes = 65536
+vm.dirty_ratio = 20
+vm.dirty_background_ratio = 10
+vm.dirty_expire_centisecs = 6000
 vm.dirty_writeback_centisecs = 500
-vm.max_map_count = 524288
-vm.overcommit_memory = 1
+vm.max_map_count = 262144
+vm.overcommit_memory = 0
 vm.page-cluster = 3
 
 # XTLS-Vision memory optimizations
@@ -131,9 +131,9 @@ vm.watermark_scale_factor = 2000
 vm.page_lock_unfairness = 1
 
 # Network queue optimization
-net.core.dev_weight = 64
-net.core.netdev_budget = 600
-net.core.netdev_budget_usecs = 8000
+net.core.dev_weight = 32
+net.core.netdev_budget = 300
+net.core.netdev_budget_usecs = 4000
 
 # IPv6 configuration
 net.ipv6.conf.all.disable_ipv6 = 0
