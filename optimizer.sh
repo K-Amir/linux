@@ -35,46 +35,46 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 #-----------------------------------------------
 cat > /etc/sysctl.d/99-xray-complete.conf << 'EOF'
 # System limits
-fs.file-max = 65535
-fs.inotify.max_user_instances = 4096
-fs.inotify.max_user_watches = 262144
+fs.file-max = 1000000
+fs.inotify.max_user_instances = 8192
+fs.inotify.max_user_watches = 524288
 
 # TCP optimization for stability and mobile apps
-net.core.somaxconn = 32768
-net.core.netdev_max_backlog = 32768
-net.core.rmem_default = 1048576
-net.core.wmem_default = 1048576
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.core.optmem_max = 65536
-net.ipv4.tcp_rmem = 8192 1048576 16777216
-net.ipv4.tcp_wmem = 8192 1048576 16777216
-net.ipv4.tcp_mem = 786432 1048576 26777216
-net.ipv4.udp_rmem_min = 8192
-net.ipv4.udp_wmem_min = 8192
+net.core.somaxconn = 65535
+net.core.netdev_max_backlog = 65535
+net.core.rmem_default = 2097152
+net.core.wmem_default = 2097152
+net.core.rmem_max = 33554432
+net.core.wmem_max = 33554432
+net.core.optmem_max = 131072
+net.ipv4.tcp_rmem = 16384 2097152 33554432
+net.ipv4.tcp_wmem = 16384 2097152 33554432
+net.ipv4.tcp_mem = 786432 2097152 33554432
+net.ipv4.udp_rmem_min = 16384
+net.ipv4.udp_wmem_min = 16384
 
 # Enhanced TCP stability and mobile optimization
 net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_syn_retries = 2
-net.ipv4.tcp_synack_retries = 1
-net.ipv4.tcp_max_syn_backlog = 32768
-net.ipv4.tcp_max_tw_buckets = 1440000
-net.ipv4.tcp_max_orphans = 65536
-net.ipv4.tcp_orphan_retries = 1
-net.ipv4.tcp_fin_timeout = 10
+net.ipv4.tcp_syn_retries = 3
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_max_syn_backlog = 65535
+net.ipv4.tcp_max_tw_buckets = 2000000
+net.ipv4.tcp_max_orphans = 131072
+net.ipv4.tcp_orphan_retries = 3
+net.ipv4.tcp_fin_timeout = 15
 net.ipv4.tcp_tw_reuse = 1
 net.ipv4.ip_local_port_range = 1024 65535
 
 # Aggressive keepalive for mobile apps
-net.ipv4.tcp_keepalive_time = 15
-net.ipv4.tcp_keepalive_intvl = 3
-net.ipv4.tcp_keepalive_probes = 5
-net.ipv4.tcp_retries1 = 2
-net.ipv4.tcp_retries2 = 3
+net.ipv4.tcp_keepalive_time = 30
+net.ipv4.tcp_keepalive_intvl = 5
+net.ipv4.tcp_keepalive_probes = 3
+net.ipv4.tcp_retries1 = 3
+net.ipv4.tcp_retries2 = 5
 
 # Connection tracking optimization
-net.netfilter.nf_conntrack_max = 131072
-net.netfilter.nf_conntrack_tcp_timeout_established = 1800
+net.netfilter.nf_conntrack_max = 262144
+net.netfilter.nf_conntrack_tcp_timeout_established = 7200
 net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 30
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 30
@@ -109,21 +109,31 @@ net.ipv4.tcp_notsent_lowat = 131072
 net.ipv4.tcp_moderate_rcvbuf = 1
 
 # Memory optimization
-vm.swappiness = 10
-vm.vfs_cache_pressure = 50
-vm.min_free_kbytes = 131072
-vm.dirty_ratio = 20
+vm.swappiness = 5
+vm.vfs_cache_pressure = 40
+vm.min_free_kbytes = 262144
+vm.dirty_ratio = 30
 vm.dirty_background_ratio = 5
-vm.dirty_expire_centisecs = 1500
-vm.dirty_writeback_centisecs = 300
-vm.max_map_count = 131072
+vm.dirty_expire_centisecs = 3000
+vm.dirty_writeback_centisecs = 500
+vm.max_map_count = 524288
 vm.overcommit_memory = 1
-vm.page-cluster = 2
+vm.page-cluster = 3
+
+# XTLS-Vision memory optimizations
+vm.nr_hugepages = 4
+vm.hugetlb_shm_group = 0
+vm.compact_memory = 1
+vm.compact_unevictable_allowed = 1
+vm.oom_kill_allocating_task = 0
+vm.watermark_boost_factor = 30000
+vm.watermark_scale_factor = 2000
+vm.page_lock_unfairness = 1
 
 # Network queue optimization
-net.core.dev_weight = 32
-net.core.netdev_budget = 200
-net.core.netdev_budget_usecs = 4000
+net.core.dev_weight = 64
+net.core.netdev_budget = 600
+net.core.netdev_budget_usecs = 8000
 
 # IPv6 configuration
 net.ipv6.conf.all.disable_ipv6 = 0
@@ -157,12 +167,26 @@ net.ipv6.ip6frag_high_thresh = 262144
 # XTLS-Vision and Reality specific optimizations
 net.ipv4.tcp_slow_start_after_idle = 0
 net.ipv4.tcp_mtu_probing = 1
-net.ipv4.tcp_limit_output_bytes = 262144
-net.ipv4.tcp_challenge_ack_limit = 1000
-net.ipv4.tcp_max_reordering = 300
+net.ipv4.tcp_limit_output_bytes = 524288
+net.ipv4.tcp_challenge_ack_limit = 2000
+net.ipv4.tcp_max_reordering = 600
 net.ipv4.tcp_workaround_signed_windows = 1
 net.ipv4.tcp_autocorking = 0
 net.ipv4.tcp_no_metrics_save = 1
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_ecn = 1
+net.ipv4.tcp_ecn_fallback = 1
+net.ipv4.tcp_app_win = 31
+net.ipv4.tcp_moderate_rcvbuf = 1
+net.ipv4.tcp_thin_linear_timeouts = 1
+
+# Reality TLS specific settings
+net.ipv4.tcp_fastopen_blackhole_timeout_sec = 0
+net.ipv4.tcp_probe_interval = 0.1
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_tso_win_divisor = 8
+net.ipv4.tcp_min_tso_segs = 2
+net.ipv4.tcp_base_mss = 1024
 EOF
 
 # Apply sysctl settings
@@ -191,14 +215,14 @@ tc qdisc change dev ${DEFAULT_NIC} root fq_codel flows 32768 quantum 1514 target
 # 5. System limits for Xray
 #-----------------------------------------------
 cat > /etc/security/limits.d/99-xray.conf << 'EOF'
-* soft     nproc          65535
-* hard     nproc          65535
-* soft     nofile         1000000
-* hard     nofile         1000000
-root soft     nproc          65535
-root hard     nproc          65535
-root soft     nofile         1000000
-root hard     nofile         1000000
+* soft     nproc          2000000
+* hard     nproc          2000000
+* soft     nofile         2000000
+* hard     nofile         2000000
+root soft     nproc          2000000
+root hard     nproc          2000000
+root soft     nofile         2000000
+root hard     nofile         2000000
 EOF
 
 #-----------------------------------------------
@@ -271,7 +295,10 @@ fi
 ethtool -s ${DEFAULT_NIC} wol d 2>/dev/null || true
 ethtool --set-eee ${DEFAULT_NIC} eee off 2>/dev/null || true
 
-# Disable TCP slow start after idle
+# Optimize for Reality TLS
+ethtool -K ${DEFAULT_NIC} ntuple on 2>/dev/null || true
+ethtool -K ${DEFAULT_NIC} rxhash on 2>/dev/null || true
+ethtool -K ${DEFAULT_NIC} rxvlan on 2>/dev/null || true
 ethtool -K ${DEFAULT_NIC} sg on 2>/dev/null || true
 ethtool -K ${DEFAULT_NIC} tso on 2>/dev/null || true
 ethtool -K ${DEFAULT_NIC} ufo on 2>/dev/null || true
@@ -283,6 +310,11 @@ ethtool -C ${DEFAULT_NIC} rx-usecs 0 rx-frames 0 2>/dev/null || true
 ethtool -C ${DEFAULT_NIC} adaptive-rx off 2>/dev/null || true
 # Set interrupt coalescing parameters for low latency
 ethtool -C ${DEFAULT_NIC} rx-usecs 0 tx-usecs 0 2>/dev/null || true
+
+# Set optimal ring buffer parameters for Reality
+ethtool -G ${DEFAULT_NIC} rx 4096 tx 4096 2>/dev/null || true
+ethtool -G ${DEFAULT_NIC} rx-mini 2048 2>/dev/null || true
+ethtool -G ${DEFAULT_NIC} rx-jumbo 4096 2>/dev/null || true
 
 #-----------------------------------------------
 # 12. XTLS-Vision Flow Control Optimizations
