@@ -32,13 +32,13 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 #-----------------------------------------------
 # 3. Enhanced sysctl configurations
 #-----------------------------------------------
-cat > /etc/sysctl.d/99-xray-complete.conf << 'EOF'
+cat > /etc/sysctl.d/99-xray-complete.conf << EOF
 # System limits
 fs.file-max = 65535
 fs.inotify.max_user_instances = 4096
 fs.inotify.max_user_watches = 262144
 
-# TCP optimization for stability and mobile apps
+# TCP optimization for stability and performance
 net.core.somaxconn = 32768
 net.core.netdev_max_backlog = 32768
 net.core.rmem_default = 1048576
@@ -48,50 +48,39 @@ net.core.wmem_max = 16777216
 net.core.optmem_max = 65536
 net.ipv4.tcp_rmem = 4096 1048576 16777216
 net.ipv4.tcp_wmem = 4096 1048576 16777216
-net.ipv4.tcp_mem = 786432 1048576 26777216
 net.ipv4.udp_rmem_min = 4096
 net.ipv4.udp_wmem_min = 4096
 
-# Enhanced TCP stability and mobile optimization
+# Enhanced TCP stability settings
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_syn_retries = 2
-net.ipv4.tcp_synack_retries = 1
-net.ipv4.tcp_max_syn_backlog = 32768
-net.ipv4.tcp_max_tw_buckets = 1440000
-net.ipv4.tcp_max_orphans = 65536
-net.ipv4.tcp_orphan_retries = 1
-net.ipv4.tcp_fin_timeout = 10
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.ip_local_port_range = 1024 65535
-
-# Aggressive keepalive for mobile apps
-net.ipv4.tcp_keepalive_time = 15
-net.ipv4.tcp_keepalive_intvl = 3
-net.ipv4.tcp_keepalive_probes = 5
-net.ipv4.tcp_retries1 = 2
-net.ipv4.tcp_retries2 = 3
-
-# Connection tracking optimization
-net.netfilter.nf_conntrack_max = 131072
-net.netfilter.nf_conntrack_tcp_timeout_established = 1800
-net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30
-net.netfilter.nf_conntrack_tcp_timeout_close_wait = 30
-net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 30
-
-# BBR and advanced TCP features
-net.core.default_qdisc = fq
-net.ipv4.tcp_congestion_control = bbr
-net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_synack_retries = 2
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_sack = 1
-net.ipv4.tcp_dsack = 1
-net.ipv4.tcp_fack = 1
-net.ipv4.tcp_early_retrans = 1
-net.ipv4.tcp_recovery = 1
-net.ipv4.tcp_thin_dupack = 1
-net.ipv4.tcp_thin_linear_timeouts = 1
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_retries1 = 3
+net.ipv4.tcp_retries2 = 5
+net.ipv4.ip_local_port_range = 1024 65535
 
-# Low latency optimizations
+# Aggressive TCP keepalive for connection persistence
+net.ipv4.tcp_keepalive_time = 30
+net.ipv4.tcp_keepalive_intvl = 5
+net.ipv4.tcp_keepalive_probes = 3
+
+# Extended connection tracking
+net.netfilter.nf_conntrack_max = 131072
+net.netfilter.nf_conntrack_tcp_timeout_established = 3600
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 30
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 60
+
+# BBR congestion control with enhanced parameters
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+
+# Additional latency optimizations
 net.ipv4.tcp_low_latency = 1
 net.ipv4.tcp_frto = 0
 net.ipv4.tcp_no_metrics_save = 1
@@ -104,27 +93,28 @@ net.ipv4.conf.all.rp_filter = 0
 net.ipv4.conf.default.rp_filter = 0
 net.core.busy_poll = 50
 net.core.busy_read = 50
+net.ipv4.tcp_challenge_ack_limit = 1000
+net.ipv4.tcp_limit_output_bytes = 262144
+
+# Memory optimization for better performance
+vm.swappiness = 10
+vm.vfs_cache_pressure = 70
+vm.min_free_kbytes = 131072
+vm.dirty_ratio = 40
+vm.dirty_background_ratio = 10
+vm.dirty_expire_centisecs = 3000
+vm.dirty_writeback_centisecs = 500
+
+# Additional TCP optimizations
+net.ipv4.tcp_fin_timeout = 10
+net.ipv4.tcp_max_tw_buckets = 2000000
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_max_syn_backlog = 32768
 net.ipv4.tcp_notsent_lowat = 131072
 net.ipv4.tcp_moderate_rcvbuf = 1
+net.ipv4.tcp_mem = 786432 1048576 26777216
 
-# Memory optimization
-vm.swappiness = 10
-vm.vfs_cache_pressure = 50
-vm.min_free_kbytes = 131072
-vm.dirty_ratio = 20
-vm.dirty_background_ratio = 5
-vm.dirty_expire_centisecs = 1500
-vm.dirty_writeback_centisecs = 300
-vm.max_map_count = 131072
-vm.overcommit_memory = 1
-vm.page-cluster = 2
-
-# Network queue optimization
-net.core.dev_weight = 32
-net.core.netdev_budget = 200
-net.core.netdev_budget_usecs = 4000
-
-# IPv6 configuration
+# IPv6 optimizations
 net.ipv6.conf.all.disable_ipv6 = 0
 net.ipv6.conf.default.disable_ipv6 = 0
 net.ipv6.conf.all.forwarding = 1
@@ -152,6 +142,16 @@ net.ipv6.mld_max_msf = 64
 net.ipv6.ip6frag_time = 60
 net.ipv6.ip6frag_low_thresh = 196608
 net.ipv6.ip6frag_high_thresh = 262144
+
+# Network queue and buffer optimizations
+net.core.dev_weight = 32
+net.core.netdev_budget = 200
+net.core.netdev_budget_usecs = 4000
+
+# Additional memory optimizations
+vm.max_map_count = 131072
+vm.overcommit_memory = 1
+vm.page-cluster = 2
 EOF
 
 # Apply sysctl settings
@@ -179,7 +179,7 @@ tc qdisc change dev ${DEFAULT_NIC} root fq_codel flows 32768 quantum 1514 target
 #-----------------------------------------------
 # 5. System limits for Xray
 #-----------------------------------------------
-cat > /etc/security/limits.d/99-xray.conf << 'EOF'
+cat > /etc/security/limits.d/99-xray.conf << EOF
 * soft     nproc          65535
 * hard     nproc          65535
 * soft     nofile         1000000
