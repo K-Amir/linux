@@ -574,40 +574,38 @@ chmod 644 /etc/cron.d/v2ray-priority
 ########################################
 # 12. Install Performance Monitoring Tools
 ########################################
-echo -e "${GREEN}Installing performance monitoring tools...${NC}"
+echo -e "${GREEN}Installing essential monitoring tools...${NC}"
 
-# Install essential monitoring tools
+# Install only the most essential monitoring tools
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    sysstat \
-    nload \
-    iotop \
-    dstat \
-    vnstat \
-    nethogs \
+    htop \
     lsof \
-    tcpdump \
-    mtr-tiny
+    tcpdump
 
-# Configure sysstat to collect data every 5 minutes
-if [ -f /etc/default/sysstat ]; then
-    sed -i 's/ENABLED="false"/ENABLED="true"/' /etc/default/sysstat
-    sed -i 's|^5-55\/10|\*/5|' /etc/cron.d/sysstat
-    systemctl enable sysstat
-    systemctl restart sysstat
-fi
-
-# Set up vnstat for network traffic monitoring
+# Set up vnstat for network traffic monitoring (lightweight and useful for bandwidth tracking)
 if command -v vnstat >/dev/null; then
-    vnstat -u -i "$DEFAULT_NIC"
+    # Check if -u parameter is supported in this version of vnstat
+    if vnstat --help 2>&1 | grep -q -- "-u"; then
+        # -u parameter is supported
+        vnstat -u -i "$DEFAULT_NIC"
+    else
+        # -u parameter is not supported, try to use the service directly
+        echo -e "${GREEN}Note: This version of vnstat doesn't support the -u parameter. Using alternative method.${NC}"
+        # Just ensure the service is enabled and running
+        systemctl enable vnstat
+        systemctl restart vnstat
+        # Try to update the database using the default method
+        vnstat -i "$DEFAULT_NIC" >/dev/null 2>&1 || true
+    fi
     systemctl enable vnstat
     systemctl restart vnstat
 fi
 
-# Create a simple performance snapshot script
+# Create a simplified performance snapshot script that focuses only on critical metrics
 cat > /usr/local/bin/vpn-performance << 'EOF'
 #!/bin/bash
-# VPN Performance Snapshot Tool
-# Captures key performance metrics for V2Ray/Xray VPN nodes
+# Simplified VPN Performance Snapshot Tool
+# Captures only essential metrics for V2Ray/Xray VPN nodes
 
 OUTPUT_DIR="/var/log/vpn-performance"
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
@@ -621,116 +619,51 @@ mkdir -p "$OUTPUT_DIR"
 echo "=== VPN Performance Snapshot ($TIMESTAMP) ===" > "$SNAPSHOT_FILE"
 echo "" >> "$SNAPSHOT_FILE"
 
-# System uptime and load
+# System uptime and load - critical for stability monitoring
 echo "=== System Uptime and Load ===" >> "$SNAPSHOT_FILE"
 uptime >> "$SNAPSHOT_FILE"
 echo "" >> "$SNAPSHOT_FILE"
 
-# Memory usage
+# Memory usage - critical for performance
 echo "=== Memory Usage ===" >> "$SNAPSHOT_FILE"
 free -h >> "$SNAPSHOT_FILE"
 echo "" >> "$SNAPSHOT_FILE"
 
-# Disk usage
-echo "=== Disk Usage ===" >> "$SNAPSHOT_FILE"
-df -h >> "$SNAPSHOT_FILE"
-echo "" >> "$SNAPSHOT_FILE"
-
-# CPU info and usage
-echo "=== CPU Information ===" >> "$SNAPSHOT_FILE"
-lscpu | grep -E 'Model name|^CPU\(s\)|MHz|Thread|Core' >> "$SNAPSHOT_FILE"
-echo "" >> "$SNAPSHOT_FILE"
-echo "=== CPU Usage (top 10 processes) ===" >> "$SNAPSHOT_FILE"
-ps aux --sort=-%cpu | head -11 >> "$SNAPSHOT_FILE"
-echo "" >> "$SNAPSHOT_FILE"
-
-# Network connections
+# Network connections - critical for VPN service
 echo "=== Network Connections Summary ===" >> "$SNAPSHOT_FILE"
-echo "Total connections: $(netstat -an | wc -l)" >> "$SNAPSHOT_FILE"
-echo "TCP connections: $(netstat -ant | wc -l)" >> "$SNAPSHOT_FILE"
-echo "UDP connections: $(netstat -anu | wc -l)" >> "$SNAPSHOT_FILE"
 echo "ESTABLISHED connections: $(netstat -ant | grep ESTABLISHED | wc -l)" >> "$SNAPSHOT_FILE"
 echo "" >> "$SNAPSHOT_FILE"
 
-# V2Ray/Xray status via x-ui
+# V2Ray/Xray status via x-ui - critical for service status
 echo "=== V2Ray/Xray Status (x-ui) ===" >> "$SNAPSHOT_FILE"
 systemctl status "$V2RAY_SERVICE" >> "$SNAPSHOT_FILE" 2>&1
 echo "" >> "$SNAPSHOT_FILE"
 
-# V2Ray/Xray process info
-echo "=== V2Ray/Xray Process Information ===" >> "$SNAPSHOT_FILE"
-V2RAY_PID=$(pgrep -f "xray|v2ray")
-if [ -n "$V2RAY_PID" ]; then
-    echo "Process ID: $V2RAY_PID" >> "$SNAPSHOT_FILE"
-    echo "CPU usage: $(ps -p "$V2RAY_PID" -o %cpu | tail -1)%" >> "$SNAPSHOT_FILE"
-    echo "Memory usage: $(ps -p "$V2RAY_PID" -o %mem | tail -1)%" >> "$SNAPSHOT_FILE"
-    echo "Running since: $(ps -p "$V2RAY_PID" -o lstart | tail -1)" >> "$SNAPSHOT_FILE"
-    echo "Open files: $(lsof -p "$V2RAY_PID" | wc -l)" >> "$SNAPSHOT_FILE"
-    echo "TCP connections: $(lsof -p "$V2RAY_PID" -a -i tcp | wc -l)" >> "$SNAPSHOT_FILE"
-    echo "UDP connections: $(lsof -p "$V2RAY_PID" -a -i udp | wc -l)" >> "$SNAPSHOT_FILE"
-else
-    echo "V2Ray/Xray process not found!" >> "$SNAPSHOT_FILE"
-fi
-
-# Also check x-ui process
-echo "" >> "$SNAPSHOT_FILE"
-echo "=== x-ui Panel Process Information ===" >> "$SNAPSHOT_FILE"
-XUI_PID=$(pgrep -f "x-ui")
-if [ -n "$XUI_PID" ]; then
-    echo "Process ID: $XUI_PID" >> "$SNAPSHOT_FILE"
-    echo "CPU usage: $(ps -p "$XUI_PID" -o %cpu | tail -1)%" >> "$SNAPSHOT_FILE"
-    echo "Memory usage: $(ps -p "$XUI_PID" -o %mem | tail -1)%" >> "$SNAPSHOT_FILE"
-    echo "Running since: $(ps -p "$XUI_PID" -o lstart | tail -1)" >> "$SNAPSHOT_FILE"
-    echo "Open files: $(lsof -p "$XUI_PID" | wc -l)" >> "$SNAPSHOT_FILE"
-else
-    echo "x-ui panel process not found!" >> "$SNAPSHOT_FILE"
-fi
-echo "" >> "$SNAPSHOT_FILE"
-
-# Network interface statistics
-echo "=== Network Interface Statistics ($DEFAULT_NIC) ===" >> "$SNAPSHOT_FILE"
-ifconfig "$DEFAULT_NIC" >> "$SNAPSHOT_FILE"
-echo "" >> "$SNAPSHOT_FILE"
+# Network interface statistics - critical for bandwidth monitoring
 if command -v vnstat >/dev/null; then
     echo "=== VnStat Traffic Statistics ===" >> "$SNAPSHOT_FILE"
     vnstat -i "$DEFAULT_NIC" >> "$SNAPSHOT_FILE"
     echo "" >> "$SNAPSHOT_FILE"
 fi
 
-# Connection tracking information
-echo "=== Connection Tracking Information ===" >> "$SNAPSHOT_FILE"
-echo "Current connections: $(cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null || echo "N/A")" >> "$SNAPSHOT_FILE"
-echo "Maximum connections: $(cat /proc/sys/net/netfilter/nf_conntrack_max 2>/dev/null || echo "N/A")" >> "$SNAPSHOT_FILE"
-echo "Connection usage: $(awk "BEGIN {printf \"%.2f%%\", $(cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null || echo 0) * 100 / $(cat /proc/sys/net/netfilter/nf_conntrack_max 2>/dev/null || echo 1)}")" >> "$SNAPSHOT_FILE"
-echo "" >> "$SNAPSHOT_FILE"
-
-# Kernel parameters
-echo "=== Key Kernel Parameters ===" >> "$SNAPSHOT_FILE"
-echo "TCP congestion control: $(sysctl -n net.ipv4.tcp_congestion_control)" >> "$SNAPSHOT_FILE"
-echo "Default qdisc: $(sysctl -n net.core.default_qdisc)" >> "$SNAPSHOT_FILE"
-echo "File max: $(sysctl -n fs.file-max)" >> "$SNAPSHOT_FILE"
-echo "Open files: $(lsof | wc -l)" >> "$SNAPSHOT_FILE"
-echo "" >> "$SNAPSHOT_FILE"
-
 echo "Performance snapshot saved to: $SNAPSHOT_FILE"
-echo "Run 'cat $SNAPSHOT_FILE' to view the results"
 EOF
 
 chmod +x /usr/local/bin/vpn-performance
 
-# Create a daily cron job to capture performance data
+# Create a daily cron job to capture performance data (reduced frequency)
 cat > /etc/cron.d/vpn-performance << 'EOF'
-# Capture VPN performance data 4 times a day
-0 */6 * * * root /usr/local/bin/vpn-performance >/dev/null 2>&1
+# Capture VPN performance data once a day
+0 0 * * * root /usr/local/bin/vpn-performance >/dev/null 2>&1
 EOF
 
 chmod 644 /etc/cron.d/vpn-performance
 
-# Create a logrotate configuration for performance snapshots
+# Create a simplified logrotate configuration for performance snapshots
 cat > /etc/logrotate.d/vpn-performance << 'EOF'
 /var/log/vpn-performance/snapshot-*.log {
     weekly
-    rotate 12
+    rotate 4
     compress
     missingok
     notifempty
@@ -738,7 +671,7 @@ cat > /etc/logrotate.d/vpn-performance << 'EOF'
 }
 EOF
 
-echo -e "${GREEN}Performance monitoring tools installed. Run 'vpn-performance' to generate a snapshot.${NC}"
+echo -e "${GREEN}Essential monitoring tools installed. Run 'vpn-performance' manually if needed.${NC}"
 
 ########################################
 # Final Message
