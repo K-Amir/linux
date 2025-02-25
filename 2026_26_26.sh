@@ -580,7 +580,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 # Configure sysstat to collect data every 5 minutes
 if [ -f /etc/default/sysstat ]; then
     sed -i 's/ENABLED="false"/ENABLED="true"/' /etc/default/sysstat
-    sed -i 's/^5-55\/10/*/5/' /etc/cron.d/sysstat
+    sed -i 's|^5-55\/10|\*/5|' /etc/cron.d/sysstat
     systemctl enable sysstat
     systemctl restart sysstat
 fi
