@@ -323,14 +323,15 @@ cat > /usr/local/bin/memory-manager << 'EOF'
 # Advanced memory management for V2Ray/Xray VPN nodes
 # This script monitors memory usage and takes appropriate actions
 # to prevent OOM killer from terminating critical services
-# Modified to be less aggressive with service restarts to avoid disrupting user connections
+# Modified to avoid service restarts completely except when service is down
 
 # Configuration
-MEMORY_THRESHOLD=90       # Increased threshold to trigger actions (was 85)
-CRITICAL_THRESHOLD=97     # Only take more aggressive action at this threshold
-SWAP_THRESHOLD=95         # Increased threshold for swap usage (was 90)
+MEMORY_THRESHOLD=90       # Threshold to trigger initial actions
+CRITICAL_THRESHOLD=97     # Threshold for more aggressive actions
+SWAP_THRESHOLD=95         # Threshold for swap usage concern
 LOG_FILE="/var/log/memory-manager.log"
 V2RAY_SERVICE="x-ui"      # Using x-ui panel service instead of direct xray/v2ray
+ALERT_FILE="/tmp/memory_alert"  # File to track alerts for external monitoring
 
 # Ensure log file exists
 touch "$LOG_FILE"
@@ -374,52 +375,61 @@ if [ "$MEM_USAGE" -gt "$MEMORY_THRESHOLD" ]; then
     log "$TOP_PROCS"
     
     # Check if x-ui service is running - only restart if it's not running at all
+    # This is the ONLY case where we restart the service
     if ! is_v2ray_running; then
         log "WARNING: $V2RAY_SERVICE is not running! Attempting to restart..."
         x-ui restart
     fi
     
-    # Take action based on severity - focus on clearing caches, not restarting services
+    # Take action based on severity - focus on clearing caches, never restart running services
     if [ "$MEM_USAGE" -gt "$CRITICAL_THRESHOLD" ]; then
-        # Critical memory pressure - take more aggressive action but avoid service restarts
+        # Critical memory pressure - take aggressive action but NEVER restart running services
         log "CRITICAL: Memory usage above ${CRITICAL_THRESHOLD}%. Taking emergency actions."
         sync
         echo 3 > /proc/sys/vm/drop_caches
         echo 1 > /proc/sys/vm/compact_memory
         
-        # Only restart in absolute emergency - both memory and swap are critically high
-        # and this has persisted for multiple checks (create a state file to track)
-        if [ "$SWAP_USAGE" -gt "$SWAP_THRESHOLD" ] && [ -f "/tmp/critical_memory_state" ]; then
-            # Check when the state file was created
-            STATE_FILE_AGE=$(($(date +%s) - $(stat -c %Y /tmp/critical_memory_state)))
-            # Only restart if the critical state has persisted for more than 30 minutes
-            if [ "$STATE_FILE_AGE" -gt 1800 ]; then
-                log "EMERGENCY: Critical memory pressure has persisted for over 30 minutes. Reluctantly restarting $V2RAY_SERVICE..."
-                x-ui restart
-                rm -f /tmp/critical_memory_state
-            else
-                log "Critical memory state has existed for $STATE_FILE_AGE seconds, monitoring..."
-            fi
-        elif [ "$SWAP_USAGE" -gt "$SWAP_THRESHOLD" ]; then
-            # Create state file to track persistence of critical state
-            touch /tmp/critical_memory_state
-            log "Created critical memory state marker. Will only restart service if condition persists for >30 minutes."
+        # Create alert file for external monitoring systems
+        if [ "$SWAP_USAGE" -gt "$SWAP_THRESHOLD" ]; then
+            log "SEVERE ALERT: Both memory (${MEM_USAGE}%) and swap (${SWAP_USAGE}%) at critical levels!"
+            echo "CRITICAL_MEMORY_ALERT: $(date)" > "$ALERT_FILE"
+            echo "Memory: ${MEM_USAGE}%" >> "$ALERT_FILE"
+            echo "Swap: ${SWAP_USAGE}%" >> "$ALERT_FILE"
+            echo "Top processes:" >> "$ALERT_FILE"
+            echo "$TOP_PROCS" >> "$ALERT_FILE"
+            
+            # Try to identify and log large memory consumers for manual investigation
+            log "Large memory consumers (processes using >100MB):"
+            ps -eo pid,ppid,cmd,%mem,%cpu,rss --sort=-rss | awk '$7>102400' >> "$LOG_FILE"
+            
+            # Additional aggressive memory freeing actions
+            # Attempt to reclaim slab objects
+            log "Attempting to reclaim slab objects..."
+            echo 2 > /proc/sys/vm/drop_caches
+            
+            # Attempt to compact memory more aggressively
+            log "Attempting aggressive memory compaction..."
+            for i in $(find /sys/devices/system/node/node*/compact -type f 2>/dev/null); do
+                echo 1 > "$i" 2>/dev/null || true
+            done
         fi
     elif [ "$MEM_USAGE" -gt 95 ]; then
-        # High memory pressure - clear page cache and dentries but don't restart services
+        # High memory pressure - clear page cache and dentries
         log "HIGH: Memory usage above 95%. Clearing page cache and dentries."
         sync
         echo 2 > /proc/sys/vm/drop_caches
         echo 1 > /proc/sys/vm/compact_memory
-        # Remove critical state file if it exists but we're below critical threshold
-        rm -f /tmp/critical_memory_state
+        
+        # Remove alert file if it exists but we're below critical threshold
+        [ -f "$ALERT_FILE" ] && rm -f "$ALERT_FILE"
     else
         # Moderate memory pressure
         log "MODERATE: Memory usage above ${MEMORY_THRESHOLD}%. Clearing page cache."
         sync
         echo 1 > /proc/sys/vm/drop_caches
-        # Remove critical state file if it exists but we're below critical threshold
-        rm -f /tmp/critical_memory_state
+        
+        # Remove alert file if it exists but we're below critical threshold
+        [ -f "$ALERT_FILE" ] && rm -f "$ALERT_FILE"
     fi
     
     # Log memory usage after actions
@@ -427,8 +437,8 @@ if [ "$MEM_USAGE" -gt "$MEMORY_THRESHOLD" ]; then
     NEW_MEM_USAGE=$(get_memory_usage)
     log "Memory usage after actions: ${NEW_MEM_USAGE}%"
 else
-    # Remove critical state file if memory usage is normal
-    rm -f /tmp/critical_memory_state
+    # Remove alert file if memory usage is normal
+    [ -f "$ALERT_FILE" ] && rm -f "$ALERT_FILE"
     # Optional: Log normal operation (uncomment if you want regular logs)
     # log "Normal memory usage: ${MEM_USAGE}%"
     :
