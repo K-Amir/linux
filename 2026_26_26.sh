@@ -330,7 +330,7 @@ MEMORY_THRESHOLD=90       # Increased threshold to trigger actions (was 85)
 CRITICAL_THRESHOLD=97     # Only take more aggressive action at this threshold
 SWAP_THRESHOLD=95         # Increased threshold for swap usage (was 90)
 LOG_FILE="/var/log/memory-manager.log"
-V2RAY_SERVICE="xray"      # Change to "v2ray" if using v2ray instead of xray
+V2RAY_SERVICE="x-ui"      # Using x-ui panel service instead of direct xray/v2ray
 
 # Ensure log file exists
 touch "$LOG_FILE"
@@ -355,7 +355,7 @@ get_top_processes() {
     ps aux --sort=-%mem | head -n 6 | awk '{print $2, $4, $11}' | tail -n +2
 }
 
-# Check if V2Ray/Xray is running
+# Check if x-ui service is running
 is_v2ray_running() {
     systemctl is-active --quiet "$V2RAY_SERVICE" && return 0 || return 1
 }
@@ -373,10 +373,10 @@ if [ "$MEM_USAGE" -gt "$MEMORY_THRESHOLD" ]; then
     TOP_PROCS=$(get_top_processes)
     log "$TOP_PROCS"
     
-    # Check if V2Ray/Xray is running - only restart if it's not running at all
+    # Check if x-ui service is running - only restart if it's not running at all
     if ! is_v2ray_running; then
         log "WARNING: $V2RAY_SERVICE is not running! Attempting to restart..."
-        systemctl restart "$V2RAY_SERVICE"
+        x-ui restart
     fi
     
     # Take action based on severity - focus on clearing caches, not restarting services
@@ -395,7 +395,7 @@ if [ "$MEM_USAGE" -gt "$MEMORY_THRESHOLD" ]; then
             # Only restart if the critical state has persisted for more than 30 minutes
             if [ "$STATE_FILE_AGE" -gt 1800 ]; then
                 log "EMERGENCY: Critical memory pressure has persisted for over 30 minutes. Reluctantly restarting $V2RAY_SERVICE..."
-                systemctl restart "$V2RAY_SERVICE"
+                x-ui restart
                 rm -f /tmp/critical_memory_state
             else
                 log "Critical memory state has existed for $STATE_FILE_AGE seconds, monitoring..."
@@ -510,13 +510,13 @@ done
 # Create a systemd service to set Xray/V2Ray process priority
 cat > /etc/systemd/system/v2ray-priority.service << 'EOF'
 [Unit]
-Description=Set V2Ray/Xray Process Priority
-After=xray.service v2ray.service
+Description=Set V2Ray/Xray Process Priority (x-ui)
+After=x-ui.service
 StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'for pid in $(pgrep -f "xray|v2ray"); do renice -n -10 $pid; ionice -c 1 -n 0 -p $pid; done'
+ExecStart=/bin/bash -c 'for pid in $(pgrep -f "xray|v2ray|x-ui"); do renice -n -10 $pid; ionice -c 1 -n 0 -p $pid; done'
 RemainAfterExit=true
 
 [Install]
@@ -532,9 +532,10 @@ systemctl start v2ray-priority.service || true
 cat > /usr/local/bin/adjust-v2ray-priority << 'EOF'
 #!/bin/bash
 # This script ensures V2Ray/Xray processes always have high priority
+# Updated for x-ui panel
 
-# Find V2Ray/Xray processes
-V2RAY_PIDS=$(pgrep -f "xray|v2ray")
+# Find V2Ray/Xray and x-ui processes
+V2RAY_PIDS=$(pgrep -f "xray|v2ray|x-ui")
 
 if [ -n "$V2RAY_PIDS" ]; then
     for pid in $V2RAY_PIDS; do
@@ -601,7 +602,7 @@ cat > /usr/local/bin/vpn-performance << 'EOF'
 OUTPUT_DIR="/var/log/vpn-performance"
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 SNAPSHOT_FILE="$OUTPUT_DIR/snapshot-$TIMESTAMP.log"
-V2RAY_SERVICE="xray"  # Change to "v2ray" if using v2ray
+V2RAY_SERVICE="x-ui"  # Using x-ui panel instead of direct xray/v2ray
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
@@ -641,14 +642,14 @@ echo "UDP connections: $(netstat -anu | wc -l)" >> "$SNAPSHOT_FILE"
 echo "ESTABLISHED connections: $(netstat -ant | grep ESTABLISHED | wc -l)" >> "$SNAPSHOT_FILE"
 echo "" >> "$SNAPSHOT_FILE"
 
-# V2Ray/Xray status
-echo "=== V2Ray/Xray Status ===" >> "$SNAPSHOT_FILE"
+# V2Ray/Xray status via x-ui
+echo "=== V2Ray/Xray Status (x-ui) ===" >> "$SNAPSHOT_FILE"
 systemctl status "$V2RAY_SERVICE" >> "$SNAPSHOT_FILE" 2>&1
 echo "" >> "$SNAPSHOT_FILE"
 
 # V2Ray/Xray process info
 echo "=== V2Ray/Xray Process Information ===" >> "$SNAPSHOT_FILE"
-V2RAY_PID=$(pgrep -f "$V2RAY_SERVICE")
+V2RAY_PID=$(pgrep -f "xray|v2ray")
 if [ -n "$V2RAY_PID" ]; then
     echo "Process ID: $V2RAY_PID" >> "$SNAPSHOT_FILE"
     echo "CPU usage: $(ps -p "$V2RAY_PID" -o %cpu | tail -1)%" >> "$SNAPSHOT_FILE"
@@ -659,6 +660,20 @@ if [ -n "$V2RAY_PID" ]; then
     echo "UDP connections: $(lsof -p "$V2RAY_PID" -a -i udp | wc -l)" >> "$SNAPSHOT_FILE"
 else
     echo "V2Ray/Xray process not found!" >> "$SNAPSHOT_FILE"
+fi
+
+# Also check x-ui process
+echo "" >> "$SNAPSHOT_FILE"
+echo "=== x-ui Panel Process Information ===" >> "$SNAPSHOT_FILE"
+XUI_PID=$(pgrep -f "x-ui")
+if [ -n "$XUI_PID" ]; then
+    echo "Process ID: $XUI_PID" >> "$SNAPSHOT_FILE"
+    echo "CPU usage: $(ps -p "$XUI_PID" -o %cpu | tail -1)%" >> "$SNAPSHOT_FILE"
+    echo "Memory usage: $(ps -p "$XUI_PID" -o %mem | tail -1)%" >> "$SNAPSHOT_FILE"
+    echo "Running since: $(ps -p "$XUI_PID" -o lstart | tail -1)" >> "$SNAPSHOT_FILE"
+    echo "Open files: $(lsof -p "$XUI_PID" | wc -l)" >> "$SNAPSHOT_FILE"
+else
+    echo "x-ui panel process not found!" >> "$SNAPSHOT_FILE"
 fi
 echo "" >> "$SNAPSHOT_FILE"
 
