@@ -113,12 +113,12 @@ net.ipv4.tcp_synack_retries = 2
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_sack = 1
 net.ipv4.tcp_window_scaling = 1
-net.ipv4.tcp_retries1 = 2
-net.ipv4.tcp_retries2 = 3
+net.ipv4.tcp_retries1 = 3
+net.ipv4.tcp_retries2 = 8
 net.ipv4.ip_local_port_range = 1024 65535
 
 # Less aggressive TCP keepalive for responsiveness & stability
-net.ipv4.tcp_keepalive_time = 300
+net.ipv4.tcp_keepalive_time = 600
 net.ipv4.tcp_keepalive_intvl = 10
 net.ipv4.tcp_keepalive_probes = 9
 
@@ -133,7 +133,7 @@ net.netfilter.nf_conntrack_tcp_be_liberal = 1
 # BBR congestion control optimizations
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
-net.ipv4.tcp_ecn = 1
+net.ipv4.tcp_ecn = 0
 
 # Virtual memory tuning (Less aggressive)
 vm.swappiness = 5
@@ -150,7 +150,7 @@ net.ipv4.tcp_mem = 196608 393216 786432
 net.ipv4.tcp_max_tw_buckets = 131072
 net.ipv4.tcp_fin_timeout = 15 # Slightly increased from 10
 net.ipv4.tcp_max_syn_backlog = 32768 # Increased from 16384
-net.ipv4.tcp_max_orphans = 65536
+net.ipv4.tcp_max_orphans = 32768
 net.ipv4.tcp_moderate_rcvbuf = 1
 
 # High-speed and low-latency tweaks
