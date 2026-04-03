@@ -55,11 +55,26 @@ fi
 
 # --- TCP memory (in 4KB pages) ---
 # Format: min pressure max
-# min ~ 3% of RAM, pressure ~ 6%, max ~ 12%
-TOTAL_PAGES=$((TOTAL_RAM_KB / 4))
-TCP_MEM_MIN=$((TOTAL_PAGES * 3 / 100))
-TCP_MEM_PRESSURE=$((TOTAL_PAGES * 6 / 100))
-TCP_MEM_MAX=$((TOTAL_PAGES * 12 / 100))
+# Over-provisioned intentionally: kernel won't allocate more than
+# available RAM, but high thresholds prevent premature throttling
+# which causes user-visible slowdowns under load.
+if [[ $TOTAL_RAM_MB -le 1200 ]]; then
+    TCP_MEM_MIN=196608      # ~768MB
+    TCP_MEM_PRESSURE=393216 # ~1.5GB
+    TCP_MEM_MAX=786432      # ~3GB
+elif [[ $TOTAL_RAM_MB -le 2500 ]]; then
+    TCP_MEM_MIN=262144      # ~1GB
+    TCP_MEM_PRESSURE=524288 # ~2GB
+    TCP_MEM_MAX=1048576     # ~4GB
+elif [[ $TOTAL_RAM_MB -le 4500 ]]; then
+    TCP_MEM_MIN=524288      # ~2GB
+    TCP_MEM_PRESSURE=786432 # ~3GB
+    TCP_MEM_MAX=1572864     # ~6GB
+else
+    TCP_MEM_MIN=786432      # ~3GB
+    TCP_MEM_PRESSURE=1048576 # ~4GB
+    TCP_MEM_MAX=2097152     # ~8GB
+fi
 
 # --- vm.min_free_kbytes (scales with RAM, capped) ---
 if [[ $TOTAL_RAM_MB -le 1200 ]]; then
@@ -267,6 +282,11 @@ net.ipv4.tcp_frto = 1
 
 # Fragmentation
 net.ipv4.ipfrag_high_thresh = 4194304
+
+# Anti-probing hardening (censored environments)
+# Prevents censors from ping-probing your VPS after detecting proxy traffic
+net.ipv4.icmp_echo_ignore_all = 1
+net.ipv6.icmp.echo_ignore_all = 1
 
 # IPv6
 net.ipv6.conf.all.disable_ipv6 = 0
