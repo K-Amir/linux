@@ -375,6 +375,8 @@ if [ -d "/sys/devices/system/cpu/cpu0/cpufreq" ]; then
     done
 fi
 
+systemctl daemon-reload
+
 ########################################
 # Summary
 ########################################
