@@ -89,7 +89,7 @@ fi
 
 # --- Max orphans (scales with RAM) ---
 if [[ $TOTAL_RAM_MB -le 1200 ]]; then
-    MAX_ORPHANS=16384
+    MAX_ORPHANS=32768
 elif [[ $TOTAL_RAM_MB -le 2500 ]]; then
     MAX_ORPHANS=32768
 elif [[ $TOTAL_RAM_MB -le 4500 ]]; then
@@ -113,8 +113,8 @@ fi
 
 # --- File descriptor limits (scale with RAM) ---
 if [[ $TOTAL_RAM_MB -le 1200 ]]; then
-    FILE_MAX=65535
-    ULIMIT_NOFILE=32768
+    FILE_MAX=131072
+    ULIMIT_NOFILE=65536
 elif [[ $TOTAL_RAM_MB -le 2500 ]]; then
     FILE_MAX=131072
     ULIMIT_NOFILE=65536
